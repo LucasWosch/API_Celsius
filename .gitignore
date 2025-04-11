@@ -1,0 +1,3 @@
+# Ignora os node_modules das subpastas
+weather-api/node_modules/
+recommendation-api/node_modules/
