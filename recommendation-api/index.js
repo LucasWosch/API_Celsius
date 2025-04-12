@@ -1,17 +1,39 @@
 const express = require('express');
 const axios = require('axios');
+const redis = require('redis');
 const app = express();
 const PORT = 3000;
 
-// URL da API B
+const client = redis.createClient({
+    url: 'redis://localhost:6379'
+});
+
+client.connect().then(() => {
+    console.log('Conectado ao Redis');
+}).catch(console.error);
+
 const API_B_URL = 'http://localhost:3001/weather';
 
 app.get('/recommendation/:city', async (req, res) => {
     const city = req.params.city;
 
     try {
-        const response = await axios.get(`${API_B_URL}/${city}`);
-        const { city: cityName, temp, unit } = response.data;
+        let cacheCity = await client.get(city);
+
+        let weatherData;
+
+        if (!cacheCity) {
+            const response = await axios.get(`${API_B_URL}/${city}`);
+            console.log("utilizando a api")
+            weatherData = response.data;
+
+            await client.setEx(city, 60, JSON.stringify(weatherData));
+        } else {
+            console.log("utilizando o cache")
+            weatherData = JSON.parse(cacheCity);
+        }
+
+        const { city: cityName, temp } = weatherData;
 
         let recommendation = '';
 
@@ -26,10 +48,10 @@ app.get('/recommendation/:city', async (req, res) => {
         res.json({
             city: cityName,
             temp,
-            unit,
             recommendation
         });
     } catch (error) {
+        console.error(error);
         res.status(500).json({ error: 'Erro ao buscar dados do clima.' });
     }
 });
